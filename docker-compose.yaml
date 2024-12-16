@@ -1,0 +1,82 @@
+version: "2"
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+    networks:
+      - kafka-network
+
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka # Use the container name as the advertised host name
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    networks:
+      - kafka-network
+
+  code_exec:
+    image: lokeshkatari/coderealm-codeexec:latest
+    container_name: code_exec
+    ports:
+      - "50052:50052"
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    privileged: true
+
+  code_client:
+    image: lokeshkatari/coderealm-client:latest
+    container_name: code_client
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - GRPC_URI_CODE_CLIENT=code_exec:50052
+      - REDIS_URI=redis://default:vjIGMyBfPrVKyR1l7F12Gf0SxvHofMmq@redis-10614.c13.us-east-1-3.ec2.cloud.redislabs.com:10614
+      - MONGO_URI=mongodb+srv://lokesh:21341A0571@cluster0.yh7v13e.mongodb.net/coderealm_ms?retryWrites=true&w=majority&appName=Cluster0
+
+  frontend:
+    image: lokeshkatari/coderealm-frontend:latest
+    container_name: frontend
+    ports:
+      - "3000:3000"
+
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=mongodb+srv://lokesh:21341A0571@cluster0.yh7v13e.mongodb.net/coderealm_ms?retryWrites=true&w=majority&appName=Cluster0
+      - REDIS_URL=redis://default:vjIGMyBfPrVKyR1l7F12Gf0SxvHofMmq@redis-10614.c13.us-east-1-3.ec2.cloud.redislabs.com:10614
+      - KAFKA_BROKER=kafka:9092
+      - AUTH_SERVICE_URL=kafka-network:8000
+  auth:
+    image: lokeshkatari/coderealm-auth:latest
+    container_name: authgrpc
+    ports:
+      - "50051:50051"
+    networks:
+      - kafka-network
+    restart: unless-stopped
+  auth_envoy:
+    image: lokeshkatari/coderealm-auth-envoy
+    container_name: authenvoy
+    ports:
+      - 8000:8000
+    networks:
+      - kafka-network
+    restart: unless-stopped
+
+networks:
+  kafka-network:
+    external: true

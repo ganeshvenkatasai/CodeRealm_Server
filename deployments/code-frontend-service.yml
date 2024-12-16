@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: code-frontend-service
+  namespace: coderealm
+spec:
+  selector:
+    app: code-frontend
+  ports:
+  - name : ingress
+    port: 80
+    targetPort: 3000
+  - name : envoy
+    port : 8000
+    targetPort: 8000
